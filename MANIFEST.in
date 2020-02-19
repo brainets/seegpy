@@ -1,0 +1,6 @@
+# Add README, LICENSE and requirements :
+include README.rst
+include LICENSE
+
+# Add data :
+include seegpy/data/*
