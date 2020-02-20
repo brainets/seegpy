@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 
 
-def read_trm(path, as_transform=True):
+def read_trm(path, as_transform=True, inverse=False):
     """Read a transformation file.
 
     Parameters
@@ -13,6 +13,8 @@ def read_trm(path, as_transform=True):
     as_transform : bool
         Get either the array as a usable (4, 4) array (True) or just simply
         or just the array contained in the file (False)
+    inverse : bool | False
+        Whether to inverse the transformation or not
 
     Returns
     -------
@@ -20,9 +22,11 @@ def read_trm(path, as_transform=True):
         Transformation array
     """
     tr = np.genfromtxt(path)
-    if not as_transform:
-        return tr
-    return np.vstack((np.c_[tr[1::, :], tr[0, :]], np.array([0, 0, 0, 1])))
+    if as_transform:
+        tr = np.vstack((np.c_[tr[1::, :], tr[0, :]], np.array([0, 0, 0, 1])))
+    if inverse:
+        tr = np.linalg.inv(tr)
+    return tr
 
 
 def read_contacts_trc(path, report=True):

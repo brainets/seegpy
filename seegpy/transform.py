@@ -41,7 +41,7 @@ def chain_transform(trs, inverse=False):
         Transformation array
     """
     tr_chain = None
-    for tr in trs:
+    for tr in reversed(trs):
         if tr_chain is None:
             tr_chain = tr
         else:

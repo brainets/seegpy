@@ -96,6 +96,7 @@ def labelling_contacts_surf_ma(bv_root, suj, xyz, radius=5., bad_label='none'):
                      np.array(ma['Hemisphere']), np.array(ma['Full name'])]
     # load Brainvisa's mesh
     vert, _, labmap = load_ma_mesh(bv_root, suj, hemi='both', transform=True)
+    # infer roi using marsatlas
     labels = labelling_contacts_surf(vert, labmap, xyz, ma_idx, ma_names,
                                      radius=radius, bad_label=bad_label)
 
