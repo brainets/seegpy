@@ -21,10 +21,12 @@ CONFIG['BV_TRM_FOLDER'] = op.join(*BV_TRM_FOLDER)
 # -----------------------------------------------------------------------------
 # FREESURFER
 
+FS_MRI_FOLDER = ('{fs_root}', '{suj}', 'mri')
 FS_MESH_FOLDER = ('{fs_root}', '{suj}', 'surf')
 FS_LABEL_FOLDER = ('{fs_root}', '{suj}', 'label')
 FS_TRM_FOLDER = ('{fs_root}', '{suj}', 'mri', 'transforms')
 
+CONFIG['FS_MRI_FOLDER'] = op.join(*FS_MRI_FOLDER)
 CONFIG['FS_MESH_FOLDER'] = op.join(*FS_MESH_FOLDER)
 CONFIG['FS_LABEL_FOLDER'] = op.join(*FS_LABEL_FOLDER)
 CONFIG['FS_TRM_FOLDER'] = op.join(*FS_TRM_FOLDER)

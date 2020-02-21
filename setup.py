@@ -37,6 +37,7 @@ setup(
     install_requires=[
         "numpy",
         "scipy",
+        "mne",
         "pandas",
         "nibabel",
     ],
