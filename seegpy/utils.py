@@ -1,5 +1,5 @@
 """Utility functions."""
-import numpy as np
+# import numpy as np
 
 
 def hemi_to_load(hemi, output_for='fs'):

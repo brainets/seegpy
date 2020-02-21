@@ -6,7 +6,7 @@ Utility functions for analyzing sEEG data
 """
 import logging
 
-from seegpy import io, labelling, mesh, transform, utils  # noqa
+from seegpy import contacts, io, labelling, mesh, pipeline, transform, utils  # noqa
 
 __version__ = "0.0.0"
 
