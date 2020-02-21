@@ -54,10 +54,11 @@ def get_contact_label_vol(vol, tab_idx, tab_labels, xyz, radius=5.,
     subvol_idx = vol[x_m, y_m, z_m]
     # get indices and number of voxels contained in the selected subvolume
     unique, counts = np.unique(subvol_idx, return_counts=True)
-    # if (len(unique) == 1) and (unique[0] == 0):
-    #     return bad_label
-    # elif (len(unique) > 1) and (0 in unique):
-    #     unique, counts = unique[1::], counts[1::]
+    if (len(unique) == 1) and (unique[0] == 0):
+        return bad_label  # skip 'Unknown' only
+    elif (len(unique) > 1) and (0 in unique):
+        # if there's 'Unknown' + something else, skip 'Unknown'
+        unique, counts = unique[1::], counts[1::]
     # infer the label
     u_vol_idx = unique[counts.argmax()]
     is_index = tab_idx == u_vol_idx
