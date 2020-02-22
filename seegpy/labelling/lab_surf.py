@@ -75,6 +75,13 @@ def labelling_contacts_surf(vert, labmap, xyz, lab_idx, lab_names, radius=5.,
     return labels
 
 
+###############################################################################
+###############################################################################
+#                           BRAINVISA / MARSATLAS
+###############################################################################
+###############################################################################
+
+
 def labelling_contacts_surf_ma(bv_root, suj, xyz, radius=5., bad_label='none',
                                verbose=None):
     """Infer contacts' ROI using MarsAtlas surface.
@@ -108,9 +115,17 @@ def labelling_contacts_surf_ma(bv_root, suj, xyz, radius=5., bad_label='none',
     labmap = load_ma_labmap(bv_root, suj, hemi='both', verbose=verbose)
     # infer roi using marsatlas
     labels = labelling_contacts_surf(vert, labmap, xyz, ma_idx, ma_names,
-                                     radius=radius, bad_label=bad_label)
+                                     radius=radius, bad_label=bad_label,
+                                     verbose=verbose)
 
     return labels
+
+
+###############################################################################
+###############################################################################
+#                                FREESURFER
+###############################################################################
+###############################################################################
 
 
 def labelling_contacts_surf_fs(fs_root, suj, xyz, radius=5., bad_label='none',
@@ -154,7 +169,8 @@ def labelling_contacts_surf_fs(fs_root, suj, xyz, radius=5., bad_label='none',
         labmap = load_fs_labmap(fs_root, suj, hemi=h, verbose=verbose)
         # infer roi using freesurfer
         _labels = labelling_contacts_surf(vert, labmap, xyz, fs_idx, fs_names,
-                                          radius=radius, bad_label=bad_label)
+                                          radius=radius, bad_label=bad_label,
+                                          verbose=verbose)
         labels += [_labels]
     labels = np.concatenate(labels, axis=0)
 
@@ -179,13 +195,13 @@ if __name__ == '__main__':
 
     # -------------------------------------------------------------------------
     # Brainvisa / MarsAtlas
-    # labs = labelling_contacts_surf_ma(bv_root, suj, xyz, radius=5.,
-    #                                   bad_label='none')
-    # print(np.c_[contact, labs])
+    labs = labelling_contacts_surf_ma(bv_root, suj, xyz, radius=5.,
+                                      bad_label='none')
+    print(np.c_[contact, labs])
 
     # -------------------------------------------------------------------------
     # Freesurfer
-    labs = labelling_contacts_surf_fs(fs_root, suj, xyz, radius=5.,
-                                      bad_label='none')
-    print(labs.shape)
-    print(np.c_[contact, labs])
+    # labs = labelling_contacts_surf_fs(fs_root, suj, xyz, radius=5.,
+    #                                   bad_label='none')
+    # print(labs.shape)
+    # print(np.c_[contact, labs])

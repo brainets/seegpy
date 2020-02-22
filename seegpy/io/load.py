@@ -180,7 +180,7 @@ def load_ma_table(verbose=None):
     ma = load_marsatlas()
     ma_idx = np.array(ma['Label'])
     ma_names = np.c_[np.array(ma['LR_Name']), np.array(ma['Lobe']),
-                     np.array(ma['Hemisphere']), np.array(ma['Full name'])]
+                     np.array(ma['Full name'])]
     logger.info('-> MarsAtlas table loaded')
 
     return ma_idx, ma_names

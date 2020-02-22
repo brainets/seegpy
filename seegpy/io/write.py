@@ -1,6 +1,8 @@
 """Writing functions."""
 import numpy as np
 
+from seegpy.io import read_trm
+
 
 def write_3dslicer_fiducial(path, c_xyz, c_names=None, description=None):
     """Write fiducial files for 3D slicer.
@@ -42,3 +44,27 @@ def write_3dslicer_fiducial(path, c_xyz, c_names=None, description=None):
                                desc=description[n_c]))
 
     file.close()
+
+
+def write_3dslicer_transform(path, trm):
+    assert ('.txt' in path), "File should end up with .txt"
+    if isinstance(trm, str):
+        trm = read_trm(trm)
+    assert isinstance(trm, np.ndarray) and (trm.shape == (4, 4))
+    # flatten the transform
+    rt = trm[:-1, :].T.ravel()
+    rt_str = ' '.join([str(k) for k in rt])
+    # open a file and write required line
+    file = open(path, 'w')
+    file.write('#Insight Transform File V1.0\n')
+    file.write('#Transform 0\n')
+    file.write('Transform: AffineTransform_double_3_3\n')
+    file.write(f'Parameters: {rt_str}\n')
+    file.write('FixedParameters: 0 0 0\n')
+    file.close()
+
+
+if __name__ == '__main__':
+    tr_path = '/home/etienne/Server/frioul/database/db_brainvisa/seeg_causal/subject_01/t1mri/default_acquisition/registration/RawT1-subject_01_default_acquisition_TO_Scanner_Based.trm'
+    save_to = '/home/etienne/DATA/RAW/CausaL/LYONNEURO_2014_DESj/TEST_DATA/x3d_bv-scanner_to_fs-scanner.txt'
+    write_3dslicer_transform(save_to, tr_path)
