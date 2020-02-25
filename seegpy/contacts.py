@@ -6,6 +6,7 @@ import numpy as np
 from scipy.spatial.distance import cdist
 import pandas as pd
 from re import findall
+from textwrap import wrap
 
 from seegpy.io import set_log_level, read_trm
 from seegpy.config import CONFIG
@@ -215,14 +216,14 @@ def contact_to_mni(fs_root, suj, c_xyz):
     return c_xyz_mni
 
 
-def read_channels_in_trc(path, report=True):
+def analyse_channels_in_trc(path, print_report=True):
     """Read the channels that are contained inside a TRC file.
 
     Parameters
     ----------
     path : string
         Path to a TRC file
-    report : bool | True
+    print_report : bool | True
         Print the report
 
     Returns
@@ -238,37 +239,67 @@ def read_channels_in_trc(path, report=True):
     seg = micro.read_segment(signal_group_mode='split-all', lazy=True)
     all_chan = [sig.name.replace(' ', '').strip().upper()
             for sig in seg.analogsignals]
+    units = [str(sig.units) for sig in seg.analogsignals]
 
     # -------------------------------------------------------------------------
     # detect seeg contacts
-    is_chan = []
+    is_chan, letter, number = [], [], []
     for n_c, c in enumerate(all_chan):
-        # first char is a letter and second a number
-        if (c[0].isalpha()) and (c[1].isdigit()): is_chan += [n_c]  # noqa
+        # define conditions
+        s_letter = (np.sum([_c.isalpha() for _c in c]) == 1) and c[0].isalpha()
+        any_digit = np.any([_c.isdigit() for _c in c])
+        len_range = (2 <= len(c) <= 4)
+        is_uv = 'uV' in units[n_c]
+        if s_letter and any_digit and len_range and is_uv:
+            letter += [''.join([i for i in c if not i.isdigit()])]
+            number += [int(findall(r'\d+', c)[0])]
+            is_chan += [n_c]
+    letter, number = np.array(letter), np.array(number)
     seeg_chan = np.array(all_chan)[is_chan]
 
     # -------------------------------------------------------------------------
-    # isolate first letter :
-    letter = np.sort([k[0] for k in seeg_chan])
-    # count the number of contacts per channels
-    contact_count = dict()
-    for l in letter:
-        num = 0
-        for c in seeg_chan:
-            if l in c: num += 1  # noqa
-        contact_count[l] = num
+    # group letters
+    gp_letter = pd.Series(letter).groupby(by=letter).groups
+    contact_info = dict()
+    for k in gp_letter.keys():
+        _gp = dict()
+        _gp['idx'] = np.array(gp_letter[k])
+        _gp['len'] = len(_gp['idx'])
+        _gp['nb'] = number[_gp['idx']]
+        _gp['suc'] = np.array_equal(_gp['nb'], np.arange(1, _gp['len'] + 1))
+        contact_info[k] = _gp
 
-    if report:
-        print('-' * 79)
-        print(f"#Channels in the TRC file : {len(all_chan)}")
-        print(f"#sEEG channel : {len(seeg_chan)}")
-        print(f"#Non sEEG channel : {len(all_chan) - len(seeg_chan)}")
-        print(f"#Electrodes : {len(letter)}")
-        print("#Contacts per electrodes :")
-        # print([print(f"{c} = {n}") for c, n in contact_count.items()])
-        s = ' | '.join([f'{c} : {n}' for (c, n) in contact_count.items()])
-        print("\n".join(wrap(s, width=79)))
-        print('-' * 79)
+    # -------------------------------------------------------------------------
+    # build the report
+
+    report = f"""
+    {'-' * 79}
+    # Number of channels : {len(all_chan)}
+    # Number of sEEG channels : {len(seeg_chan)}
+    # Number of non-sEEG channel : {len(all_chan) - len(seeg_chan)}
+    # Number of electrodes : {len(contact_info.keys())}
+    {'-' * 79}
+    List of channels :
+    {', '.join(all_chan)}
+    {'-' * 79}
+    List of sEEG channels :
+    {', '.join(seeg_chan)}
+    {'-' * 79}\n"""
+    for l, r in contact_info.items():
+        report += f"    * Electrode : {l}\n"
+        report += f"        Number of contacts : {r['len']}\n"
+        report += f"        Numbers : {r['nb']}\n"
+        report += f"        Successive : {r['suc']}\n"
+
+
+    # -------------------------------------------------------------------------
+    # count the number of contacts per channels
+    if isinstance(print_report, bool) and print_report:
+        print(report)
+    elif isinstance(print_report, str):
+        file = open(print_report, 'w')
+        file.write(report)
+        file.close()
 
     return seeg_chan
 
