@@ -9,7 +9,7 @@ from mne.source_space import _get_lut
 
 from seegpy.config import CONFIG
 from seegpy.transform import apply_transform
-from seegpy.io import set_log_level
+from seegpy.io import set_log_level, load_ma_table
 
 
 logger = logging.getLogger('seegpy')
@@ -75,8 +75,60 @@ def get_contact_label_vol(vol, tab_idx, tab_labels, xyz, radius=5.,
 ###############################################################################
 
 
-def labelling_contacts_vol_ma():
-    pass
+def labelling_contacts_vol_ma(bv_root, suj, xyz, radius=5., bad_label='none',
+                              verbose=None):
+    """Labelling contacts using MarsAtlas volume.
+
+    Parameters
+    ----------
+    bv_root : string
+        Path to the BrainVisa folder where subject are stored
+    suj : string
+        Subject name (e.g 'subject_01')
+    xyz : array_like
+        Array of contacts' coordinates of shape (n_contacts, 3)
+    radius : float | 5.
+        Use the voxels that are contained in a sphere centered arround each
+        contact
+    bad_label : string | 'none'
+        Label to use for contacts that have no close roi
+
+    Returns
+    -------
+    labels : array_like
+        Array of labels of shape (n_contacts,)
+    """
+    set_log_level(verbose)
+    # -------------------------------------------------------------------------
+    # build path to the volume file
+    mri_path = CONFIG['BV_LABMAP_FOLDER'].format(bv_root=bv_root, suj=suj)
+    mgz_path = op.join(mri_path, f"{suj}_parcellation.nii.gz")
+    if not op.isfile(mgz_path):
+        raise IOError(f"File {mgz_path} doesn't exist.")
+    n_contacts = xyz.shape[0]
+    logger.info(f"-> Localize {n_contacts} using MarsAtlas volume")
+
+    # -------------------------------------------------------------------------
+    # load volume and transformation
+    arch = nibabel.load(mgz_path)
+    vol = arch.get_data()
+    tr = arch.affine
+    vs = nibabel.affines.voxel_sizes(tr)
+    assert np.array_equal(vs, np.array([1., 1., 1.])), "Need to be updated"
+    # load marsatlas table
+    ma_idx, ma_labels = load_ma_table(verbose=verbose)
+
+    # -------------------------------------------------------------------------
+    # transform coordinates into the voxel space
+    xyz_tr = apply_transform(tr, xyz, inverse=True)
+    # localize contacts
+    labels = []
+    for k in range(n_contacts):
+        _lab = get_contact_label_vol(vol, ma_idx, ma_labels, xyz_tr[k, :],
+                                     radius=radius, bad_label=bad_label)
+        labels += [_lab]
+
+    return np.array(labels)
 
 
 ###############################################################################

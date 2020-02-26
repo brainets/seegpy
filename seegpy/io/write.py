@@ -47,6 +47,16 @@ def write_3dslicer_fiducial(path, c_xyz, c_names=None, description=None):
 
 
 def write_3dslicer_transform(path, trm):
+    """Write transformation compatible with 3d Slicer.
+
+    Parameters
+    ----------
+    path : string
+        Full path where to save the transformation (should end with txt, for
+        example tr_post_to_pre.txt)
+    trm : array_like
+        The (4, 4) transformation array
+    """
     assert ('.txt' in path), "File should end up with .txt"
     if isinstance(trm, str):
         trm = read_trm(trm)
