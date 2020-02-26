@@ -16,7 +16,7 @@ logger = logging.getLogger('seegpy')
 
 
 def get_contact_label_vol(vol, tab_idx, tab_labels, xyz, radius=5.,
-                          bad_label='none'):
+                          wm_idx=None, bad_label='none'):
     """Get the label of a single contact in a volume.
 
     Parameters
@@ -43,6 +43,10 @@ def get_contact_label_vol(vol, tab_idx, tab_labels, xyz, radius=5.,
         Label associate to the contact's coordinates
     """
     assert len(tab_idx) == len(tab_labels)
+    if tab_labels.ndim == 1:
+        tab_labels = tab_labels.reshape(-1, 1)
+    n_labs = tab_labels.shape[-1]
+    bad_labels = np.full((1, n_labs), bad_label)
     # build the voxel mask (under `radius`)
     mask = np.arange(-int(radius), int(radius) + 1)
     [x_m, y_m, z_m] = np.meshgrid(mask, mask, mask)
@@ -55,17 +59,28 @@ def get_contact_label_vol(vol, tab_idx, tab_labels, xyz, radius=5.,
     # get indices and number of voxels contained in the selected subvolume
     unique, counts = np.unique(subvol_idx, return_counts=True)
     if (len(unique) == 1) and (unique[0] == 0):
-        return bad_label  # skip 'Unknown' only
-    elif (len(unique) > 1) and (0 in unique):
+        return bad_labels  # skip 'Unknown' only
+    else:
         # if there's 'Unknown' + something else, skip 'Unknown'
-        unique, counts = unique[1::], counts[1::]
+        counts[unique == 0] = 0
+    # white matter indices
+    if isinstance(wm_idx, list):
+        for wm in wm_idx:
+            if (len(unique) == 1) and (unique[0] == wm):
+                return tab_labels[wm]
+            else:
+                counts[unique == wm] = 0
     # infer the label
     u_vol_idx = unique[counts.argmax()]
     is_index = tab_idx == u_vol_idx
     if is_index.any():
-        return tab_labels[is_index][0]
+        return tab_labels[is_index, :][0].reshape(1, -1)
     else:
-        return bad_label
+        return bad_labels
+
+
+def _process_bad_label(unique, counts):
+    pass
 
 
 ###############################################################################
@@ -127,8 +142,9 @@ def labelling_contacts_vol_ma(bv_root, suj, xyz, radius=5., bad_label='none',
         _lab = get_contact_label_vol(vol, ma_idx, ma_labels, xyz_tr[k, :],
                                      radius=radius, bad_label=bad_label)
         labels += [_lab]
+    labels = np.concatenate(labels, axis=0)
 
-    return np.array(labels)
+    return labels
 
 
 ###############################################################################
@@ -180,6 +196,8 @@ def labelling_contacts_vol_fs_mgz(fs_root, suj, xyz, radius=5., file='aseg',
                       "subfolder.")
     n_contacts = xyz.shape[0]
     logger.info(f"-> Localize {n_contacts} using {file}.mgz")
+    # white matter indices
+    wm_idx = [2, 41]
 
     # -------------------------------------------------------------------------
     # load volume and transformation
@@ -200,7 +218,29 @@ def labelling_contacts_vol_fs_mgz(fs_root, suj, xyz, radius=5., file='aseg',
     labels = []
     for k in range(n_contacts):
         _lab = get_contact_label_vol(vol, fs_idx, fs_labels, xyz_tr[k, :],
-                                     radius=radius, bad_label=bad_label)
+                                     radius=radius, bad_label=bad_label,
+                                     wm_idx=wm_idx)
         labels += [_lab]
 
     return np.array(labels)
+
+
+if __name__ == '__main__':
+    from seegpy.io import read_3dslicer_fiducial
+
+    fs_root = '/home/etienne/Server/frioul/database/db_freesurfer/seeg_causal'
+    bv_root = '/home/etienne/Server/frioul/database/db_brainvisa/seeg_causal'
+    suj = 'subject_01'
+    save_to = '/run/media/etienne/DATA/RAW/CausaL/LYONNEURO_2014_DESj/TEST_DATA'
+
+    # -------------------------------------------------------------------------
+    # path = '/home/etienne/DATA/RAW/CausaL/LYONNEURO_2015_BARv/3dslicer/recon.fcsv'
+    path = '/run/media/etienne/DATA/RAW/CausaL/LYONNEURO_2014_DESj/TEST_DATA/recon.fcsv'
+    df = read_3dslicer_fiducial(path)
+    c_xyz = np.array(df[['x', 'y', 'z']])
+    c_names = np.array(df['label'])
+
+
+    lab = labelling_contacts_vol_fs_mgz(fs_root, suj, c_xyz, radius=2,
+                                        file='aparc.a2009s+aseg')
+    print(np.c_[c_names, lab])

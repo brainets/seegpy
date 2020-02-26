@@ -9,7 +9,8 @@ from seegpy.config import CONFIG
 from seegpy.io import set_log_level
 from seegpy.labelling import (labelling_contacts_surf_ma,
                               labelling_contacts_surf_fs,
-                              labelling_contacts_vol_fs_mgz)
+                              labelling_contacts_vol_fs_mgz,
+                              labelling_contacts_vol_ma)
 from seegpy.contacts import (successive_monopolar_contacts,
                              compute_middle_contact, contact_to_mni)
 
@@ -51,7 +52,7 @@ def pipeline_labelling_ss(save_path, fs_root, bv_root, suj, c_xyz, c_names,
     set_log_level(verbose)
     assert op.isdir(save_path)
     kw = dict(radius=radius, bad_label=bad_label, verbose=verbose)
-    fs_vol_files = ['aseg', 'aparc+aseg', 'aparc.a2009s+aseg']
+    fs_vol_file = 'aparc.a2009s+aseg'
     # define how the file is going to be saved
     save_as = op.join(save_to, f"{suj}.xlsx")
 
@@ -95,53 +96,65 @@ def pipeline_labelling_ss(save_path, fs_root, bv_root, suj, c_xyz, c_names,
         # ---------------------------------------------------------------------
         # VOLUMIQUE LABELLING
         # ---------------------------------------------------------------------
+        # MarsAtlas volumique labelling
+        _ma_lab_vol = labelling_contacts_vol_ma(bv_root, suj, cur_xyz, **kw)
+        df_ma_vol = pd.DataFrame()
+        df_ma_vol['Lobe'] = _ma_lab_vol[:, 1]
+        df_ma_vol['MarsAtlas'] = _ma_lab_vol[:, 0]
+        df_ma_vol['MarsAtlas Full'] = _ma_lab_vol[:, 2]
+
         # Freesurfer volumique labelling
-        df_fs_vol = pd.DataFrame()
-        for fs_vol_file in fs_vol_files:
-            _labs = labelling_contacts_vol_fs_mgz(
-                fs_root, suj, cur_xyz, file=fs_vol_file, **kw)
-            df_fs_vol[f"{fs_vol_file}.vol"] = _labs
+        fs_labels = labelling_contacts_vol_fs_mgz(fs_root, suj, cur_xyz,
+                                                  file=fs_vol_file, **kw)
+        df_fs_vol = pd.DataFrame(fs_labels.ravel(), columns=['Freesurfer'])
 
         # build hemisphere
-        hemi = [k.split('-')[0] for k in df_fs_vol["aseg.vol"]]
+        hemi = np.array(['Right'] * cur_xyz.shape[0])
+        hemi[cur_xyz[:, 0] < 0] = 'Left'
         df_hemi = pd.DataFrame(hemi, columns=['Hemisphere'])
 
         # build the white / grey matter and subcortical in aseg
-        matter = df_fs_vol["aseg.vol"].copy()
+        matter = df_fs_vol["Freesurfer"].copy()
         matter.replace(CONFIG['FS_CLEANUP'], inplace=True, regex=True)
-        df_matter = pd.DataFrame(np.array(matter), columns=['Matter'])
+        matter_arr = np.array(matter)
+        m_is_none = matter_arr == bad_label
+        m_is_sub = matter_arr == 'Subcortical'
+        m_is_white = matter_arr == 'White'
+        nn_grey_matter = np.c_[m_is_none, m_is_sub, m_is_white].any(axis=1)
+        matter_arr[~nn_grey_matter] = 'Grey'
+        df_matter = pd.DataFrame(matter_arr, columns=['Matter'])
 
         # ---------------------------------------------------------------------
         # SURFACE LABELLING
         # ---------------------------------------------------------------------
         # Freesurfer surface labelling
-        fs_surf = labelling_contacts_surf_fs(fs_root, suj, cur_xyz, **kw)
-        df_fs_surf = pd.DataFrame(fs_surf, columns=['aparc.a2009s.surf'])
+        # fs_surf = labelling_contacts_surf_fs(fs_root, suj, cur_xyz, **kw)
+        # df_fs_surf = pd.DataFrame(fs_surf, columns=['aparc.a2009s.surf'])
 
-        # MarsAtlas surface labelling
-        ma_surf = labelling_contacts_surf_ma(bv_root, suj, cur_xyz, **kw)
-        df_ma_surf = pd.DataFrame(ma_surf, columns=[
-            'MarsAtlasSurf', 'Lobe', 'MarsAtlasSurf Full'])
+        # # MarsAtlas surface labelling
+        # ma_surf = labelling_contacts_surf_ma(bv_root, suj, cur_xyz, **kw)
+        # df_ma_surf = pd.DataFrame(ma_surf, columns=[
+        #     'MarsAtlasSurf', 'Lobe', 'MarsAtlasSurf Full'])
 
         # build MarsAtlas subcortical based on Freesurfer ouputs
-        zp = zip(CONFIG['FS_SUBCORTICAL'], CONFIG['MA_SUBCORTICAL'])
-        repl = {i_fs: i_ma for i_fs, i_ma in zp}
-        ma_sub = df_fs_vol["aseg.vol"].copy()
-        ma_sub.replace(repl, inplace=True, regex=True)
-        pa = ma_sub.str.findall('(' + '|'.join(CONFIG['MA_SUBCORTICAL']) + ')')
-        is_sub = np.array(pa.astype(bool))
-        df_ma_surf['MarsAtlasSurf'].iloc[is_sub] = ma_sub.iloc[is_sub]
-        df_ma_surf['MarsAtlasSurf Full'].iloc[is_sub] = ma_sub.iloc[is_sub]
-        df_ma_surf['Lobe'].iloc[is_sub] = df_matter['Matter'].iloc[is_sub]
+        # zp = zip(CONFIG['FS_SUBCORTICAL'], CONFIG['MA_SUBCORTICAL'])
+        # repl = {i_fs: i_ma for i_fs, i_ma in zp}
+        # ma_sub = df_fs_vol["Freesurfer"].copy()
+        # ma_sub.replace(repl, inplace=True, regex=True)
+        # pa = ma_sub.str.findall('(' + '|'.join(CONFIG['MA_SUBCORTICAL']) + ')')
+        # is_sub = np.array(pa.astype(bool))
+        # df_ma_surf['MarsAtlasSurf'].iloc[is_sub] = ma_sub.iloc[is_sub]
+        # df_ma_surf['MarsAtlasSurf Full'].iloc[is_sub] = ma_sub.iloc[is_sub]
+        # df_ma_surf['Lobe'].iloc[is_sub] = df_matter['Matter'].iloc[is_sub]
 
         # ---------------------------------------------------------------------
         # FINALIZE DATAFRAME
         # ---------------------------------------------------------------------
         # drop aseg labels (because redundant)
-        df_fs_vol.drop(columns="aseg.vol", inplace=True)
+        # df_fs_vol.drop(columns="aseg.vol", inplace=True)
         # merge everything
-        _df = pd.concat((df_name, df_matter, df_hemi, df_ma_surf, df_fs_surf,
-                         df_fs_vol, df_coords), axis=1)
+        _df = pd.concat((df_name, df_matter, df_hemi, df_ma_vol, df_fs_vol,
+                         df_coords), axis=1)
         df[derivation] = _df
 
     # -------------------------------------------------------------------------
