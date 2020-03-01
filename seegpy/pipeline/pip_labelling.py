@@ -13,6 +13,7 @@ from seegpy.labelling import (labelling_contacts_surf_ma,
                               labelling_contacts_vol_ma)
 from seegpy.contacts import (successive_monopolar_contacts,
                              compute_middle_contact, contact_to_mni)
+from seegpy.testing import test_located_contacts, test_volume_ma
 
 
 logger = logging.getLogger('seegpy')
@@ -20,7 +21,7 @@ logger = logging.getLogger('seegpy')
 
 def pipeline_labelling_ss(save_path, fs_root, bv_root, suj, c_xyz, c_names,
                           bipolar=True, radius=5., bad_label='none',
-                          verbose=None):
+                          testing=True, verbose=None):
     """Single subject contact labelling pipeline.
 
     Parameters
@@ -48,13 +49,19 @@ def pipeline_labelling_ss(save_path, fs_root, bv_root, suj, c_xyz, c_names,
         Label to use for contacts that have no close roi
     """
     # -------------------------------------------------------------------------
+    # test the provided data
+    if testing:
+        test_located_contacts(c_xyz, c_names)
+        test_volume_ma(bv_root, suj)
+
+    # -------------------------------------------------------------------------
     # file checking
     set_log_level(verbose)
     assert op.isdir(save_path)
     kw = dict(radius=radius, bad_label=bad_label, verbose=verbose)
     fs_vol_file = 'aparc.a2009s+aseg'
     # define how the file is going to be saved
-    save_as = op.join(save_to, f"{suj}.xlsx")
+    save_as = op.join(save_path, f"{suj}.xlsx")
 
     # -------------------------------------------------------------------------
     # monopolar and bipolar

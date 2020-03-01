@@ -16,7 +16,7 @@ logger = logging.getLogger('seegpy')
 
 
 def get_contact_label_vol(vol, tab_idx, tab_labels, xyz, radius=5.,
-                          wm_idx=None, bad_label='none'):
+                          wm_idx=None, vs=None, bad_label='none'):
     """Get the label of a single contact in a volume.
 
     Parameters
@@ -34,6 +34,11 @@ def get_contact_label_vol(vol, tab_idx, tab_labels, xyz, radius=5.,
     radius : float | 5.
         Use the voxels that are contained in a sphere centered arround each
         contact
+    wm_idx : array_like | None
+        List of white matter indices
+    vs : array_like | None
+        Voxel sizes. Should be a list (or array) of length 3 describing the
+        voxel sizes along the (x, y, z) axes.
     bad_label : string | 'none'
         Label to use for contacts that have no close roi
 
@@ -45,11 +50,20 @@ def get_contact_label_vol(vol, tab_idx, tab_labels, xyz, radius=5.,
     assert len(tab_idx) == len(tab_labels)
     if tab_labels.ndim == 1:
         tab_labels = tab_labels.reshape(-1, 1)
+    if vs is None:
+        vs = [1, 1, 1]
     n_labs = tab_labels.shape[-1]
     bad_labels = np.full((1, n_labs), bad_label)
+    vs_x, vs_y, vs_z = vs[0], vs[1], vs[2]
+    # build distances along (x, y, z) axes
+    d_x = int(np.round(radius / vs_x))
+    d_y = int(np.round(radius / vs_y))
+    d_z = int(np.round(radius / vs_z))
     # build the voxel mask (under `radius`)
-    mask = np.arange(-int(radius), int(radius) + 1)
-    [x_m, y_m, z_m] = np.meshgrid(mask, mask, mask)
+    mask_x = np.arange(-d_x, d_x + 1)
+    mask_y = np.arange(-d_y, d_y + 1)
+    mask_z = np.arange(-d_z, d_z + 1)
+    [x_m, y_m, z_m] = np.meshgrid(mask_x, mask_y, mask_z)
     mask_vol = np.sqrt(x_m ** 2 + y_m ** 2 + z_m ** 2) <= radius
     # get indices for selecting voxels under `radius`
     x_m = x_m[mask_vol] + int(np.round(xyz[0]))
@@ -129,7 +143,6 @@ def labelling_contacts_vol_ma(bv_root, suj, xyz, radius=5., bad_label='none',
     vol = arch.get_data()
     tr = arch.affine
     vs = nibabel.affines.voxel_sizes(tr)
-    assert np.array_equal(vs, np.array([1., 1., 1.])), "Need to be updated"
     # load marsatlas table
     ma_idx, ma_labels = load_ma_table(verbose=verbose)
 
@@ -140,7 +153,7 @@ def labelling_contacts_vol_ma(bv_root, suj, xyz, radius=5., bad_label='none',
     labels = []
     for k in range(n_contacts):
         _lab = get_contact_label_vol(vol, ma_idx, ma_labels, xyz_tr[k, :],
-                                     radius=radius, bad_label=bad_label)
+                                     radius=radius, bad_label=bad_label, vs=vs)
         labels += [_lab]
     labels = np.concatenate(labels, axis=0)
 
@@ -205,7 +218,6 @@ def labelling_contacts_vol_fs_mgz(fs_root, suj, xyz, radius=5., file='aseg',
     vol = arch.get_data()
     tr = arch.affine
     vs = nibabel.affines.voxel_sizes(tr)
-    assert np.array_equal(vs, np.array([1., 1., 1.])), "Need to be updated"
     # load freesurfer LUT table using mne
     lut = _get_lut()
     fs_labels = np.array(lut['name'])
@@ -219,7 +231,7 @@ def labelling_contacts_vol_fs_mgz(fs_root, suj, xyz, radius=5., file='aseg',
     for k in range(n_contacts):
         _lab = get_contact_label_vol(vol, fs_idx, fs_labels, xyz_tr[k, :],
                                      radius=radius, bad_label=bad_label,
-                                     wm_idx=wm_idx)
+                                     wm_idx=wm_idx, vs=vs)
         labels += [_lab]
 
     return np.array(labels)

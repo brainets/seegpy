@@ -289,6 +289,7 @@ def analyse_channels_in_trc(path, print_report=True):
         report += f"    * Electrode : {l}\n"
         report += f"        Number of contacts : {r['len']}\n"
         report += f"        Numbers : {r['nb']}\n"
+        report += f"        Max : {max(r['nb'])}\n"
         report += f"        Successive : {r['suc']}\n"
 
 
