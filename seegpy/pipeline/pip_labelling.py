@@ -12,7 +12,8 @@ from seegpy.labelling import (labelling_contacts_surf_ma,
                               labelling_contacts_vol_fs_mgz,
                               labelling_contacts_vol_ma)
 from seegpy.contacts import (successive_monopolar_contacts,
-                             compute_middle_contact, contact_to_mni)
+                             compute_middle_contact, contact_to_mni,
+                             clean_contact)
 from seegpy.testing import test_located_contacts, test_volume_ma
 
 
@@ -53,6 +54,7 @@ def pipeline_labelling_ss(save_path, fs_root, bv_root, suj, c_xyz, c_names,
     if testing:
         test_located_contacts(c_xyz, c_names)
         test_volume_ma(bv_root, suj)
+    c_names = np.asarray(clean_contact(list(c_names)))
 
     # -------------------------------------------------------------------------
     # file checking
@@ -61,7 +63,7 @@ def pipeline_labelling_ss(save_path, fs_root, bv_root, suj, c_xyz, c_names,
     kw = dict(radius=radius, bad_label=bad_label, verbose=verbose)
     fs_vol_file = 'aparc.a2009s+aseg'
     # define how the file is going to be saved
-    save_as = op.join(save_path, f"{suj}.xlsx")
+    save_as = op.join(save_path, f"{suj}_radius-{radius}.xlsx")
 
     # -------------------------------------------------------------------------
     # monopolar and bipolar
