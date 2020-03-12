@@ -8,7 +8,7 @@ import pandas as pd
 from re import findall
 from textwrap import wrap
 
-from seegpy.io import set_log_level, read_trm
+from seegpy.io.syslog import set_log_level
 from seegpy.config import CONFIG
 from seegpy.transform import apply_transform
 
@@ -167,7 +167,7 @@ def successive_monopolar_contacts(c_names, c_xyz, radius=5., verbose=None):
     mask = np.stack((mask_letter, mask_number, mask_dist)).all(0)
     (an_idx, cat_idx) = np.where(mask)
     an_names, cat_names = c_names[an_idx], c_names[cat_idx]
-    
+
     return an_names, cat_names, an_idx, cat_idx
 
 
@@ -206,6 +206,7 @@ def contact_to_mni(fs_root, suj, c_xyz):
     c_xyz_mni : array_like
         Contacts in the MNI space
     """
+    from seegpy.io.read import read_trm
     # path to the transformation
     trm_path = CONFIG['FS_TRM_FOLDER'].format(fs_root=fs_root, suj=suj)
     trm_file = f'{suj}_scanner_to_mni.trm'
@@ -216,126 +217,88 @@ def contact_to_mni(fs_root, suj, c_xyz):
     return c_xyz_mni
 
 
-def analyse_channels_in_trc(path, print_report=True):
-    """Read the channels that are contained inside a TRC file.
+def detect_seeg_contacts(ch_names, ch_units=None, seeg_unit='uV'):
+    """Detect sEEG and non-sEEG channels.
 
     Parameters
     ----------
-    path : string
-        Path to a TRC file
-    print_report : bool | True
-        Print the report
+    ch_names : list
+        List of channel names
+    ch_units : list | None
+        List of units per channel
+    seeg_unit : str | 'uV'
+        sEEG unit to spot
 
     Returns
     -------
-    seeg_chan : array_like
-        Array of channels contained in the TRC file
+    is_seeg : array_like
+        Array of boolean values describing sEEG (True) and non-sEEG (False)
+        channels
     """
-    import neo
+    ch_names = np.asarray(ch_names)
+    assert ch_names.ndim == 1
+    n_chan = len(ch_names)
+    # manage channel units
+    if ch_units is None:
+        is_units = np.ones((n_chan,), dtype=bool)
+    else:
+        is_units = np.array([seeg_unit in k for k in ch_units])
+    # find symbols in channel names
+    is_sym = []
+    for c in ch_names:
+        is_sym += [len(findall('[!@#$%^&*(),.?":{}|<>+]', c))]
+    is_sym = np.array(is_sym, dtype=bool)
+    # split into letter / number
+    is_let, is_num, is_let_len, is_num_len = [], [], [], []
+    for c in ch_names:
+        # detect letters / num
+        _letter = findall(r'[A-Za-z]+', c)
+        _num = findall(r'\d+', c)
+        # keep if there's a letter and a number
+        is_let += [len(_letter)]
+        is_num += [len(_num)]
+        # keep if the length correspond
+        if len(_letter) == 1:
+            is_let_len += [1 <= len(_letter[0]) <= 2]
+        else:
+            is_let_len += [False]
+        if len(_num) == 1:
+            is_num_len += [1 <= len(_num[0]) <= 2]
+        else:
+            is_num_len += [False]
+    is_let = np.array(is_let, dtype=bool)
+    is_num = np.array(is_num, dtype=bool)
+    is_let_len = np.array(is_let_len, dtype=bool)
+    is_num_len = np.array(is_num_len, dtype=bool)
+    # looks for duplicates
+    is_dup = np.zeros((n_chan,), dtype=bool)
+    if len(ch_names) != len(np.unique(ch_names)):
+        # find duplicates channels
+        u, c = np.unique(ch_names, return_counts=True)
+        dup = u[c > 1]
+        logger.warning(f"{len(dup)} duplicated channels : {dup}")
+        # remove duplicates
+        for c in dup:
+            is_dup[np.where(ch_names == c)[0].max()] = True
+    # merge all conditions
+    all_cond = np.c_[is_units, ~is_sym, is_let, is_num, is_let_len, is_num_len,
+        ~is_dup]
+    is_seeg = all_cond.all(axis=1)
+    seeg_chan = ch_names[is_seeg]
+    assert len(seeg_chan) == len(np.unique(seeg_chan))
 
-    # -------------------------------------------------------------------------
-    # read the channels
-    micro = neo.MicromedIO(filename=path)
-    seg = micro.read_segment(signal_group_mode='split-all', lazy=True)
-    all_chan = [sig.name.replace(' ', '').strip().upper()
-            for sig in seg.analogsignals]
-    units = [str(sig.units) for sig in seg.analogsignals]
-
-    # -------------------------------------------------------------------------
-    # detect seeg contacts
-    is_chan, letter, number = [], [], []
-    for n_c, c in enumerate(all_chan):
-        # define conditions
-        s_letter = (np.sum([_c.isalpha() for _c in c]) == 1) and c[0].isalpha()
-        any_digit = np.any([_c.isdigit() for _c in c])
-        len_range = (2 <= len(c) <= 4)
-        is_uv = 'uV' in units[n_c]
-        if s_letter and any_digit and len_range and is_uv:
-            letter += [''.join([i for i in c if not i.isdigit()])]
-            number += [int(findall(r'\d+', c)[0])]
-            is_chan += [n_c]
-    letter, number = np.array(letter), np.array(number)
-    seeg_chan = np.array(all_chan)[is_chan]
-
-    # -------------------------------------------------------------------------
-    # group letters
-    gp_letter = pd.Series(letter).groupby(by=letter).groups
-    contact_info = dict()
-    for k in gp_letter.keys():
-        _gp = dict()
-        _gp['idx'] = np.array(gp_letter[k])
-        _gp['len'] = len(_gp['idx'])
-        _gp['nb'] = number[_gp['idx']]
-        _gp['suc'] = np.array_equal(_gp['nb'], np.arange(1, _gp['len'] + 1))
-        contact_info[k] = _gp
-
-    # -------------------------------------------------------------------------
-    # build the report
-
-    report = f"""
-    {'-' * 79}
-    # Number of channels : {len(all_chan)}
-    # Number of sEEG channels : {len(seeg_chan)}
-    # Number of non-sEEG channel : {len(all_chan) - len(seeg_chan)}
-    # Number of electrodes : {len(contact_info.keys())}
-    {'-' * 79}
-    List of channels :
-    {', '.join(all_chan)}
-    {'-' * 79}
-    List of sEEG channels :
-    {', '.join(seeg_chan)}
-    {'-' * 79}\n"""
-    for l, r in contact_info.items():
-        report += f"    * Electrode : {l}\n"
-        report += f"        Number of contacts : {r['len']}\n"
-        report += f"        Numbers : {r['nb']}\n"
-        report += f"        Max : {max(r['nb'])}\n"
-        report += f"        Successive : {r['suc']}\n"
-
-
-    # -------------------------------------------------------------------------
-    # count the number of contacts per channels
-    if isinstance(print_report, bool) and print_report:
-        print(report)
-    elif isinstance(print_report, str):
-        file = open(print_report, 'w')
-        file.write(report)
-        file.close()
-
-    return seeg_chan
-
+    return is_seeg
 
 if __name__ == '__main__':
-    from seegpy.io import read_3dslicer_fiducial
-    # -------------------------------------------------------------------------
-    # clean contact names
-    # c_names = ['A02 - A01', 'B2- B10']
-    # print(clean_contact(c_names))
+    from seegpy.io import read_contacts_trc
 
-    # # -------------------------------------------------------------------------
-    # # mono -> bipo
-    # c_names = ['A01', 'A02', 'A03', 'x', 'B01', 'B02', 'B03', 'B04', 'C1']
-    # print(contact_mono_to_bipo(c_names))
+    path = '/home/etienne/DATA/RAW/CausaL/LYONNEURO_2014_DESj/LYONNEURO_2014_DESJ_bloc1.TRC'
+    # path = '/home/etienne/DATA/RAW/CausaL/LYONNEURO_2015_BOUa/EEG_13484.TRC'
+    ch_names, ch_units = read_contacts_trc(path)
+    print(ch_names)
+    print(len(ch_names))
 
-    # -------------------------------------------------------------------------
-    # path = '/home/etienne/DATA/RAW/CausaL/LYONNEURO_2015_BARv/3dslicer/recon.fcsv'
-    path = '/run/media/etienne/DATA/RAW/CausaL/LYONNEURO_2014_DESj/TEST_DATA/recon.fcsv'
-    df = read_3dslicer_fiducial(path)
-    c_xyz = np.array(df[['x', 'y', 'z']])
-    c_names = np.array(df['label'])
+    is_seeg = detect_seeg_contacts(ch_names, ch_units=ch_units)
+    print(np.array(ch_names)[is_seeg])
 
-    # n_1, n_2, c_1, c_2 = successive_monopolar_contacts(c_names, c_xyz)
-    # print(np.c_[n_2, n_1])
 
-    fs_root = '/home/etienne/Server/frioul/database/db_freesurfer/seeg_causal'
-    bv_root = '/home/etienne/Server/frioul/database/db_brainvisa/seeg_causal'
-    suj = 'subject_01'
-    xyz_mni = contact_to_mni(fs_root, suj, c_xyz.copy())
-
-    from visbrain.objects import BrainObj, SourceObj, SceneObj
-
-    sc = SceneObj()
-    sc.add_to_subplot(BrainObj("B1"))
-    sc.add_to_subplot(SourceObj('orig', c_xyz, color='red'))
-    sc.add_to_subplot(SourceObj('mni', xyz_mni, color='green'))
-    sc.preview()
