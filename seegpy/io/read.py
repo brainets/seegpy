@@ -199,8 +199,13 @@ def read_pramat(mat_root):
     sf = float(np.array(f['srate'])[0][0])
     # load the time vector
     times = np.array(f['time']).squeeze()
-    # load trigger data and remove the inter-zeros
+    # load trigger data
     trig_event = np.round(f['raw'][-1, :]).astype(int).squeeze()
+    # keep only the first trigger changes (rm duplicates)
+    first_only = np.where(trig_event[1::] - trig_event[:-1])[0] + 1
+    trig_event = trig_event[first_only]
+    times = times[first_only]
+    # remove inter zeros
     nnz = trig_event != 0
     trig_event = trig_event[nnz]
     trig_time = times[nnz]
