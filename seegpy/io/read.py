@@ -186,7 +186,7 @@ def read_pramat(mat_root):
     # read channel names and types
     cn = [''.join(chr(i) for i in f[k[0]][:]) for k in list(fc['name'])]
     ct = [''.join(chr(i) for i in f[k[0]][:]) for k in list(fc['signalType'])]
-    ch_names = np.array(cn)
+    ch_names = np.array([k.upper() for k in cn])
     # get only sEEG channels
     is_seeg = np.array(ct) == 'SEEG'
     seeg_chan = np.array(ch_names)[is_seeg]
