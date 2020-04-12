@@ -46,7 +46,7 @@ def test_volume_ma(bv_root, suj):
 if __name__ == '__main__':
     from seegpy.io import set_log_level
     bv_root = '/home/etienne/Server/frioul/database/db_brainvisa/seeg_causal'
-    suj = 'subject_02'
+    suj = 'subject_07'
 
     test_volume_ma(bv_root, suj)
 

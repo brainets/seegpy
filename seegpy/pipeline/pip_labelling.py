@@ -52,7 +52,7 @@ def pipeline_labelling_ss(save_path, fs_root, bv_root, suj, c_xyz, c_names,
     # -------------------------------------------------------------------------
     # test the provided data
     if testing:
-        # test_located_contacts(c_xyz, c_names)
+        test_located_contacts(c_xyz, c_names)
         test_volume_ma(bv_root, suj)
     c_names = np.asarray(clean_contact(list(c_names)))
 
