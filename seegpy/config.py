@@ -55,3 +55,5 @@ MA_SUBCORTICAL = [
     'L_NAc', 'L_Amyg', 'L_Cd', 'L_Hipp', 'L_GP', 'L_Put', 'L_Thal',
     'R_NAc', 'R_Amyg', 'R_Cd', 'R_Hipp', 'R_GP', 'R_Put', 'R_Thal']
 CONFIG['MA_SUBCORTICAL'] = MA_SUBCORTICAL
+CONFIG['LOBES'] = ['Frontal', 'Occipital', 'Parietal', 'Subcortical',
+                   'Temporal']
