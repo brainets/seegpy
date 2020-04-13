@@ -57,6 +57,11 @@ def plot_anat_repartition_ma(roi, n_subjects=False, merge_lr=False,
     # test inputs types
     assert isinstance(roi, list)
     assert all([isinstance(k, np.ndarray) for k in roi])
+    if merge_lr:
+        for k in range(len(roi)):
+            _roi = pd.Series(roi[k])
+            _roi.replace({'R\\_': 'L_'}, regex=True, inplace=True)
+            roi[k] = np.array(list(_roi))
     if n_subjects:
         roi = [np.unique(k) for k in roi]
     all_roi = np.r_[tuple(roi)]
@@ -66,7 +71,6 @@ def plot_anat_repartition_ma(roi, n_subjects=False, merge_lr=False,
     # group by roi
     df_roi = pd.DataFrame(dict(roi=all_roi, count=np.ones((len(all_roi),))))
     if merge_lr:
-        df_roi.replace({'R\\_': 'L_'}, regex=True, inplace=True)
         n_c, n_r, figsize = 30, 11, (12, 10)
     else:
         n_c, n_r, figsize = 30, 23, (16, 10)
@@ -138,5 +142,5 @@ if __name__ == '__main__':
 
     title = f'Number of bipolar derivations per roi (n_suj={len(roi)})'
 
-    plot_anat_repartition_ma(roi, title=title, merge_lr=True)
+    plot_anat_repartition_ma(roi, title=title, merge_lr=True, n_subjects=True)
     plt.show()
