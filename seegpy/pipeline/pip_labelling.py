@@ -97,20 +97,20 @@ def pipeline_labelling_ss(save_path, fs_root, bv_root, suj, c_xyz, c_names,
         df_coords['y_scanner'] = cur_xyz[:, 1]
         df_coords['z_scanner'] = cur_xyz[:, 2]
         # mni coordinates
-        cur_xyz_mni = contact_to_mni(fs_root, suj, cur_xyz)
-        df_coords['x_mni'] = cur_xyz_mni[:, 0]
-        df_coords['y_mni'] = cur_xyz_mni[:, 1]
-        df_coords['z_mni'] = cur_xyz_mni[:, 2]
+        # cur_xyz_mni = contact_to_mni(fs_root, suj, cur_xyz)
+        # df_coords['x_mni'] = cur_xyz_mni[:, 0]
+        # df_coords['y_mni'] = cur_xyz_mni[:, 1]
+        # df_coords['z_mni'] = cur_xyz_mni[:, 2]
 
         # ---------------------------------------------------------------------
         # VOLUMIQUE LABELLING
         # ---------------------------------------------------------------------
         # MarsAtlas volumique labelling
-        _ma_lab_vol = labelling_contacts_vol_ma(bv_root, suj, cur_xyz, **kw)
         df_ma_vol = pd.DataFrame()
-        df_ma_vol['Lobe'] = _ma_lab_vol[:, 1]
-        df_ma_vol['MarsAtlas'] = _ma_lab_vol[:, 0]
-        df_ma_vol['MarsAtlas Full'] = _ma_lab_vol[:, 2]
+        # _ma_lab_vol = labelling_contacts_vol_ma(bv_root, suj, cur_xyz, **kw)
+        # df_ma_vol['Lobe'] = _ma_lab_vol[:, 1]
+        # df_ma_vol['MarsAtlas'] = _ma_lab_vol[:, 0]
+        # df_ma_vol['MarsAtlas Full'] = _ma_lab_vol[:, 2]
 
         # Freesurfer volumique labelling
         fs_labels = labelling_contacts_vol_fs_mgz(fs_root, suj, cur_xyz,
